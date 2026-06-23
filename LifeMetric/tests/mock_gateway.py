@@ -16,6 +16,7 @@ Supports CORS and exposes:
 
 import json
 import uuid
+import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 PORT = 8080
@@ -127,25 +128,47 @@ class MockGatewayHandler(BaseHTTPRequestHandler):
             print(f"📡 Ingested telemetry from {device_uuid} -> HR: {hr} BPM, RR: {rr} Br/m, Position Z: {tele_data.get('com_z')}m")
             
             alert = None
+            
+            # Determine if the device is currently calibrating
+            device_info = registered_devices.get(device_uuid, {})
+            is_calibrating = device_info.get("status") == "calibrating"
+            confidence = "reduced_confidence_calibration" if is_calibrating else "high"
+
             if v_z < -1.8:
                 # Trigger a fall event
                 alert = {
                     "event_id": str(uuid.uuid4()),
                     "event_type": "alert.fall.predictive",
+                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     "device_uuid": device_uuid,
-                    "room_label": "Room 204 - Bathroom"
+                    "room_label": "Room 204 - Bathroom",
+                    "data": {
+                        "predicted_impact_seconds": 1.2,
+                        "velocity_z_m_s": v_z,
+                        "confidence_score": 0.92,
+                        "calibration_phase": is_calibrating,
+                        "confidence_status": confidence
+                    }
                 }
             elif is_dangling:
                 # Trigger a bed dangling event
                 alert = {
                     "event_id": str(uuid.uuid4()),
                     "event_type": "alert.bed_exit.dangling",
+                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     "device_uuid": device_uuid,
-                    "room_label": "Room 102 - Bed"
+                    "room_label": "Room 102 - Bed",
+                    "data": {
+                        "action": "dangling_detected",
+                        "elapsed_dangling_seconds": 15,
+                        "calibration_phase": is_calibrating,
+                        "confidence_status": confidence
+                    }
                 }
 
             if alert:
                 print(f"🚨 [GATEWAY ALERT ENGINE] Triggered {alert['event_type']} for {alert['room_label']}")
+                print(f"   ↳ [METADATA] Calibration Active: {is_calibrating} | Confidence Status: {confidence}")
                 triggered_alerts_queue.append(alert)
                 
                 self._set_headers(202)
@@ -153,7 +176,9 @@ class MockGatewayHandler(BaseHTTPRequestHandler):
                     "status": "accepted",
                     "message": "Telemetry received, critical alert dispatched",
                     "triggered_event_id": alert["event_id"],
-                    "event_type": alert["event_type"]
+                    "event_type": alert["event_type"],
+                    "calibration_phase": is_calibrating,
+                    "confidence_status": confidence
                 }).encode('utf-8'))
                 return
 

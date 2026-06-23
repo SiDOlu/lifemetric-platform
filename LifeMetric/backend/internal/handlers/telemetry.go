@@ -38,6 +38,13 @@ func IngestTelemetryHandler(c *fiber.Ctx) error {
 	// 1. Process Kinematics: Fall Detection / Predication
 	var alert *models.AlertEvent
 
+	// Determine if the device is in the 48-hour calibration window (Heuristic Fallback Mode)
+	isCalibrating := device.Status == "calibrating"
+	confidenceStatus := "high"
+	if isCalibrating {
+		confidenceStatus = "reduced_confidence_calibration"
+	}
+
 	// Check for predicted / incipient fall (Unstable Descent: high downward velocity before impact)
 	if payload.Data.VelocityZ < -1.8 {
 		alert = &models.AlertEvent{
@@ -50,6 +57,8 @@ func IngestTelemetryHandler(c *fiber.Ctx) error {
 				"predicted_impact_seconds": 1.2,
 				"velocity_z_m_s":          payload.Data.VelocityZ,
 				"confidence_score":         0.92,
+				"calibration_phase":        isCalibrating,
+				"confidence_status":        confidenceStatus,
 			},
 		}
 	} else if payload.Data.IsDangling {
@@ -63,6 +72,8 @@ func IngestTelemetryHandler(c *fiber.Ctx) error {
 			Data: map[string]interface{}{
 				"action":                   "dangling_detected",
 				"elapsed_dangling_seconds": 15,
+				"calibration_phase":        isCalibrating,
+				"confidence_status":        confidenceStatus,
 			},
 		}
 	}
@@ -81,6 +92,8 @@ func IngestTelemetryHandler(c *fiber.Ctx) error {
 			"message":            "Telemetry received, critical alert dispatched",
 			"triggered_event_id": alert.EventID,
 			"event_type":         alert.EventType,
+			"calibration_phase":  isCalibrating,
+			"confidence_status":  confidenceStatus,
 		})
 	}
 
