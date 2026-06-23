@@ -191,9 +191,10 @@ document.getElementById('btn-fall').addEventListener('click', () => setFallState
 document.getElementById('btn-ack').addEventListener('click', setAcknowledgedState);
 
 // ============================================================================
-// REAL-TIME WEBSOCKET INTEGRATION
+// REAL-TIME WEBSOCKET & HTTP POLLING INTEGRATION
 // ============================================================================
 let ws = null;
+let pollingTimer = null;
 
 function connectWebSocket() {
     console.log("[WEBSOCKET] Connecting to LifeMetrics Ingestion API Gateway...");
@@ -206,34 +207,64 @@ function connectWebSocket() {
     };
 
     ws.onclose = () => {
-        console.log("[WEBSOCKET] Disconnected from Gateway. Attempting reconnection...");
-        connDot.className = "w-2.5 h-2.5 bg-slate-500 rounded-full animate-pulse";
-        connStatus.textContent = "Disconnected - Reconnecting...";
-        
-        // Auto-reconnect every 5 seconds
-        setTimeout(connectWebSocket, 5000);
+        console.log("[WEBSOCKET] Connection closed. Falling back to HTTP polling...");
+        ws = null;
+        startHTTPPolling();
     };
 
     ws.onerror = (err) => {
-        console.error("[WEBSOCKET] Error detected:", err);
-        ws.close();
+        console.warn("[WEBSOCKET] Connection failed. Initiating HTTP polling fallback...");
+        if (ws) ws.close();
     };
 
     ws.onmessage = (event) => {
         try {
             const alert = JSON.parse(event.data);
             console.log("[WEBSOCKET] Real-Time Alert Received:", alert);
-
-            // Dynamically update the active Room 204 dashboard card
-            if (alert.event_type === "alert.fall.predictive" || alert.event_type === "alert.fall.confirmed") {
-                setFallState({ bpm: 110, breaths: 26 });
-            } else if (alert.event_type === "alert.bed_exit.dangling") {
-                setDanglingState({ bpm: 82, breaths: 19 });
-            }
+            handleIncomingAlert(alert);
         } catch (e) {
             console.error("[WEBSOCKET] Failed to parse alert data packet:", e);
         }
     };
+}
+
+function startHTTPPolling() {
+    if (pollingTimer) return; // Prevent duplicate timers
+    console.log("[POLLING] Active HTTP Polling Fallback Enabled.");
+    connDot.className = "w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse";
+    connStatus.textContent = "Connected (HTTP Polling)";
+
+    pollingTimer = setInterval(() => {
+        fetch("http://localhost:8080/api/v1/alerts/poll")
+            .then(res => {
+                if (!res.ok) throw new Error("Gateway offline");
+                return res.json();
+            })
+            .then(data => {
+                // Update connection status back to OK if it was offline
+                connDot.className = "w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse";
+                connStatus.textContent = "Connected (HTTP Polling)";
+                
+                if (data && data.event_type) {
+                    console.log("[POLLING] Real-Time Alert Received:", data);
+                    handleIncomingAlert(data);
+                }
+            })
+            .catch(err => {
+                console.log("[POLLING] Gateway unreachable, retrying...");
+                connDot.className = "w-2.5 h-2.5 bg-slate-500 rounded-full animate-pulse";
+                connStatus.textContent = "Gateway Unreachable";
+            });
+    }, 1000);
+}
+
+function handleIncomingAlert(alert) {
+    // Dynamically update the active Room 204 dashboard card
+    if (alert.event_type === "alert.fall.predictive" || alert.event_type === "alert.fall.confirmed") {
+        setFallState({ bpm: 110, breaths: 26 });
+    } else if (alert.event_type === "alert.bed_exit.dangling") {
+        setDanglingState({ bpm: 82, breaths: 19 });
+    }
 }
 
 // Initialize active dashboard states and connect to real-time stream
