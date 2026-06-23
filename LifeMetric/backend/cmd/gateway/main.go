@@ -5,6 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/websocket/v2"
 	"github.com/lifemetric/platform/backend/internal/config"
 	"github.com/lifemetric/platform/backend/internal/handlers"
 	"github.com/lifemetric/platform/backend/internal/middleware"
@@ -12,6 +13,9 @@ import (
 
 func main() {
 	cfg := config.LoadConfig()
+
+	// 1. Initialize and run the Global WebSocket broadcast Hub in a background thread
+	go handlers.GlobalHub.Run()
 
 	app := fiber.New(fiber.Config{
 		AppName: "LifeMetrics Ambient Ingestion API Gateway v1.0",
@@ -28,6 +32,24 @@ func main() {
 			"version": "1.0.0",
 		})
 	})
+
+	// 2. Real-Time WebSocket Route Upgrader and Ingestion Endpoint
+	app.Use("/ws", handlers.UpgradeWebSocketHandler)
+
+	app.Get("/ws/clinical/alerts", websocket.New(func(c *websocket.Conn) {
+		client := &handlers.Client{Conn: c}
+		handlers.GlobalHub.Register <- client
+		defer func() {
+			handlers.GlobalHub.Unregister <- client
+		}()
+
+		// Keep connection alive, listening for inbound messages or pings
+		for {
+			if _, _, err := c.ReadMessage(); err != nil {
+				break
+			}
+		}
+	}))
 
 	// Secure API v1 Router Group (Enforcing JWT verification and role scopes)
 	api := app.Group("/api/v1")

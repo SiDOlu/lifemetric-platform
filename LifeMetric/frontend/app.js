@@ -99,6 +99,9 @@ const vitalHR = document.getElementById('vital-hr');
 const vitalRR = document.getElementById('vital-rr');
 const fallModal = document.getElementById('fall-modal');
 
+const connDot = document.getElementById('connection-dot');
+const connStatus = document.getElementById('connection-status');
+
 // Reset to standard safe state
 function setStandardState() {
     stopSiren();
@@ -119,7 +122,7 @@ function setStandardState() {
 }
 
 // Set Yellow Warning state for Dangling (Bed-Exit Intent)
-function setDanglingState() {
+function setDanglingState(vitals) {
     stopSiren();
     startChime();
 
@@ -133,12 +136,17 @@ function setDanglingState() {
     
     // Update metrics
     metricPos.textContent = "Sitting on Edge";
-    vitalHR.textContent = "82 BPM";
-    vitalRR.textContent = "19 /min";
+    if (vitals) {
+        vitalHR.textContent = vitals.bpm + " BPM";
+        vitalRR.textContent = vitals.breaths + " /min";
+    } else {
+        vitalHR.textContent = "82 BPM";
+        vitalRR.textContent = "19 /min";
+    }
 }
 
 // Set Red Danger state for Fall
-function setFallState() {
+function setFallState(vitals) {
     stopSiren();
     startSiren();
 
@@ -153,8 +161,13 @@ function setFallState() {
 
     // Update metrics
     metricPos.textContent = "Fallen on Floor";
-    vitalHR.textContent = "110 BPM";
-    vitalRR.textContent = "26 /min";
+    if (vitals) {
+        vitalHR.textContent = vitals.bpm + " BPM";
+        vitalRR.textContent = vitals.breaths + " /min";
+    } else {
+        vitalHR.textContent = "110 BPM";
+        vitalRR.textContent = "26 /min";
+    }
 }
 
 // Acknowledge alert, silencing sound and setting Room to "Assistance Dispatched" status
@@ -172,10 +185,57 @@ function setAcknowledgedState() {
 }
 
 // Button Click Event Listeners
-document.getElementById('btn-standard').addEventListener('click', setStandardState);
-document.getElementById('btn-dangling').addEventListener('click', setDanglingState);
-document.getElementById('btn-fall').addEventListener('click', setFallState);
+document.getElementById('btn-standard').addEventListener('click', () => setStandardState());
+document.getElementById('btn-dangling').addEventListener('click', () => setDanglingState());
+document.getElementById('btn-fall').addEventListener('click', () => setFallState());
 document.getElementById('btn-ack').addEventListener('click', setAcknowledgedState);
 
-// Default boot setup
+// ============================================================================
+// REAL-TIME WEBSOCKET INTEGRATION
+// ============================================================================
+let ws = null;
+
+function connectWebSocket() {
+    console.log("[WEBSOCKET] Connecting to LifeMetrics Ingestion API Gateway...");
+    ws = new WebSocket("ws://localhost:8080/ws/clinical/alerts");
+
+    ws.onopen = () => {
+        console.log("[WEBSOCKET] Connected to Live Gateway.");
+        connDot.className = "w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse";
+        connStatus.textContent = "Connected to Live Gateway";
+    };
+
+    ws.onclose = () => {
+        console.log("[WEBSOCKET] Disconnected from Gateway. Attempting reconnection...");
+        connDot.className = "w-2.5 h-2.5 bg-slate-500 rounded-full animate-pulse";
+        connStatus.textContent = "Disconnected - Reconnecting...";
+        
+        // Auto-reconnect every 5 seconds
+        setTimeout(connectWebSocket, 5000);
+    };
+
+    ws.onerror = (err) => {
+        console.error("[WEBSOCKET] Error detected:", err);
+        ws.close();
+    };
+
+    ws.onmessage = (event) => {
+        try {
+            const alert = JSON.parse(event.data);
+            console.log("[WEBSOCKET] Real-Time Alert Received:", alert);
+
+            // Dynamically update the active Room 204 dashboard card
+            if (alert.event_type === "alert.fall.predictive" || alert.event_type === "alert.fall.confirmed") {
+                setFallState({ bpm: 110, breaths: 26 });
+            } else if (alert.event_type === "alert.bed_exit.dangling") {
+                setDanglingState({ bpm: 82, breaths: 19 });
+            }
+        } catch (e) {
+            console.error("[WEBSOCKET] Failed to parse alert data packet:", e);
+        }
+    };
+}
+
+// Initialize active dashboard states and connect to real-time stream
 setStandardState();
+connectWebSocket();

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"log"
 	"time"
 
@@ -69,7 +70,12 @@ func IngestTelemetryHandler(c *fiber.Ctx) error {
 	// Dispatch alerts asynchronously if triggered
 	if alert != nil {
 		log.Printf("[ALERT DISPATCHER] High-Priority Event Triggered: %s in %s", alert.EventType, alert.RoomLabel)
-		// Here, we would publish to AWS SQS and dispatch to webhooks and Nurse Call endpoints
+		
+		// Serialize and broadcast alert to connected web terminals in real-time
+		if alertJSON, err := json.Marshal(alert); err == nil {
+			GlobalHub.Broadcast <- alertJSON
+		}
+
 		return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
 			"status":             "accepted",
 			"message":            "Telemetry received, critical alert dispatched",
