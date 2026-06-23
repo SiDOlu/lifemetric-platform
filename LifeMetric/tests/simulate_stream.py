@@ -139,6 +139,8 @@ def run_simulation():
                     # Parse if alert was triggered
                     if resp.get("triggered_event_id"):
                         print(f"🚨 [ALERT ROUTED] HTTP {status}: {resp['triggered_event_id']} | Type: {resp['event_type']} | {resp['message']}")
+                        if "calibration_phase" in resp:
+                            print(f"   ↳ [FALLBACK MONITORING] Calibration Active: {resp['calibration_phase']} | Status: {resp['confidence_status']}")
                     else:
                         print(f"📡 [STREAMING] HTTP {status}: Telemetry Metadata Ingested. HR: {phase['vitals'][0]} BPM, RR: {phase['vitals'][1]} Br/min")
                 else:
