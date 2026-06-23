@@ -1,26 +1,7 @@
-# OS Files
+*.pkg
+*.env
+.env
+settings.json
+*.pem
+node_modules/
 .DS_Store
-**/.DS_Store
-Thumbs.db
-
-# Installation binaries
-AWSCLIV2.pkg
-
-# Go binaries and builds
-backend/bin/
-backend/tmp/
-backend/out/
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-
-# Local developer/editor settings
-.vscode/
-.idea/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.swp
