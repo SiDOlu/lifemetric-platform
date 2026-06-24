@@ -195,8 +195,17 @@ document.getElementById('btn-ack').addEventListener('click', setAcknowledgedStat
 // ============================================================================
 let ws = null;
 let pollingTimer = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_DELAY = 30000;
+let reconnectTimeout = null;
 
 function connectWebSocket() {
+    // Clear any pending reconnection attempts
+    if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
+    }
+
     console.log("[WEBSOCKET] Connecting to LifeMetrics Ingestion API Gateway...");
     ws = new WebSocket("ws://localhost:8080/ws/clinical/alerts");
 
@@ -204,16 +213,31 @@ function connectWebSocket() {
         console.log("[WEBSOCKET] Connected to Live Gateway.");
         connDot.className = "w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse";
         connStatus.textContent = "Connected to Live Gateway";
+        
+        // SUCCESS: Stop polling and reset reconnection logic
+        reconnectAttempts = 0;
+        if (pollingTimer) {
+            console.log("[WEBSOCKET] Reconnection successful. Stopping HTTP polling.");
+            clearInterval(pollingTimer);
+            pollingTimer = null;
+        }
     };
 
     ws.onclose = () => {
-        console.log("[WEBSOCKET] Connection closed. Falling back to HTTP polling...");
+        console.log("[WEBSOCKET] Connection closed.");
         ws = null;
-        startHTTPPolling();
+        
+        // If we are not already polling, start polling
+        if (!pollingTimer) {
+            startHTTPPolling();
+        }
+        
+        scheduleReconnection();
     };
 
     ws.onerror = (err) => {
-        console.warn("[WEBSOCKET] Connection failed. Initiating HTTP polling fallback...");
+        console.warn("[WEBSOCKET] Connection error occurred.");
+        // ws.close() will trigger onclose
         if (ws) ws.close();
     };
 
@@ -226,6 +250,19 @@ function connectWebSocket() {
             console.error("[WEBSOCKET] Failed to parse alert data packet:", e);
         }
     };
+}
+
+function scheduleReconnection() {
+    if (reconnectTimeout) return;
+
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), MAX_RECONNECT_DELAY);
+    console.log(`[WEBSOCKET] Scheduling reconnection attempt ${reconnectAttempts + 1} in ${delay}ms...`);
+    
+    reconnectTimeout = setTimeout(() => {
+        reconnectTimeout = null;
+        reconnectAttempts++;
+        connectWebSocket();
+    }, delay);
 }
 
 function startHTTPPolling() {
