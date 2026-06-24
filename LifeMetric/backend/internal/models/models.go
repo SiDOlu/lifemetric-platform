@@ -28,14 +28,16 @@ type IngestionPayload struct {
 	DeviceUUID string `json:"device_uuid"`
 	Timestamp  string `json:"timestamp"`
 	Data       struct {
-		CenterOfMassX float64 `json:"com_x"`
-		CenterOfMassY float64 `json:"com_y"`
-		CenterOfMassZ float64 `json:"com_z"`
-		VelocityZ     float64 `json:"velocity_z"`
-		IsDangling    bool    `json:"is_dangling"`
-		IsPresent     bool    `json:"is_present"`
-		VitalsBPM     int     `json:"vitals_bpm"`     // Contactless heart rate
-		VitalsBreaths int     `json:"vitals_breaths"` // Contactless respiratory rate
+		CenterOfMassX    float64 `json:"com_x"`
+		CenterOfMassY    float64 `json:"com_y"`
+		CenterOfMassZ    float64 `json:"com_z"`
+		VelocityZ        float64 `json:"velocity_z"`
+		IsDangling       bool    `json:"is_dangling"`
+		IsPresent        bool    `json:"is_present"`
+		VitalsBPM        int     `json:"vitals_bpm"`     // Contactless heart rate
+		VitalsBreaths    int     `json:"vitals_breaths"` // Contactless respiratory rate
+		CalibrationPhase string  `json:"calibration_phase"`
+		ConfidenceStatus string  `json:"confidence_status"`
 	} `json:"data"`
 }
 

@@ -50,6 +50,8 @@ func IngestTelemetryHandler(c *fiber.Ctx) error {
 				"predicted_impact_seconds": 1.2,
 				"velocity_z_m_s":          payload.Data.VelocityZ,
 				"confidence_score":         0.92,
+				"calibration_phase":       payload.Data.CalibrationPhase,
+				"confidence_status":       payload.Data.ConfidenceStatus,
 			},
 		}
 	} else if payload.Data.IsDangling {
@@ -63,6 +65,8 @@ func IngestTelemetryHandler(c *fiber.Ctx) error {
 			Data: map[string]interface{}{
 				"action":                   "dangling_detected",
 				"elapsed_dangling_seconds": 15,
+				"calibration_phase":       payload.Data.CalibrationPhase,
+				"confidence_status":       payload.Data.ConfidenceStatus,
 			},
 		}
 	}
