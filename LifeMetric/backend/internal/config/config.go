@@ -29,15 +29,15 @@ func LoadConfig() *Config {
 		jwtSecret = "sec_jwt_lifemetric_ambient_intel_39485"
 	}
 
-	myBalanceSecret := os.Getenv("MY_BALANCE_SECRET")
-	if myBalanceSecret == "" {
-		myBalanceSecret = "sec_mybalanceapp_subscription_billing_928"
+	StripeWebhookSecret := os.Getenv("MY_BALANCE_SECRET")
+	if StripeWebhookSecret == "" {
+		StripeWebhookSecret = "whsec_mock_lifemetric_test_key"
 	}
 
 	return &Config{
 		Port:            port,
 		DatabaseURL:     dbURL,
 		JWTSecret:       jwtSecret,
-		MyBalanceSecret: myBalanceSecret,
+		MyBalanceSecret: StripeWebhookSecret,
 	}
 }

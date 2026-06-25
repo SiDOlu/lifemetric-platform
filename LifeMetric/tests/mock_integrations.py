@@ -5,7 +5,7 @@ Author: Hana (Backend Engineer)
 
 This server simulates our external healthcare and billing integrations:
 1. HL7 FHIR R4 EHR Server (Epic, Cerner, PointClickCare) to sync patient contexts & contactless vitals.
-2. mybalanceapp.com Subscription Portal to simulate SaaS subscription upgrades and payment verify hooks.
+2. stripe.com Subscription Portal to simulate SaaS subscription upgrades and payment verify hooks.
 
 Runs on local port 8081.
 """
@@ -65,9 +65,9 @@ class MockIntegrationHandler(BaseHTTPRequestHandler):
             print("  ↳ Returned: Female, Born 1948-03-12, Uses Cane / Shuffling Gait (64kg)")
             return
 
-        # 2. Handle mybalanceapp.com plan verification status
-        # e.g., GET /mybalanceapp/subscriptions/verify?tenant_id=...
-        if "/mybalanceapp/subscriptions/verify" in self.path:
+        # 2. Handle stripe.com plan verification status
+        # e.g., GET /v1/stripe/subscriptions/verify?tenant_id=...
+        if "/v1/stripe/subscriptions/verify" in self.path:
             verify_payload = {
                 "tenant_id": "aa1c305b-9d4f-4d67-8e12-3cf9052735ba",
                 "subscription_status": "premium_active",
@@ -121,9 +121,9 @@ class MockIntegrationHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"status": "Observation Created", "fhir_id": "obs_9028475a"}, indent=2).encode('utf-8'))
             return
 
-        # 2. Handle mybalanceapp.com Checkout
-        if self.path == "/mybalanceapp/checkout":
-            print("\n[MOCK BILLING] 🛍️ Processing Subscription Checkout via mybalanceapp.com API:")
+        # 2. Handle stripe.com Checkout
+        if self.path == "/v1/stripe/checkout":
+            print("\n[MOCK BILLING] 🛍️ Processing Subscription Checkout via stripe.com API:")
             print(f"  ↳ Tenant Business: {body.get('business_name', 'Unnamed Facility')}")
             print(f"  ↳ Selected Plan: {body.get('selected_plan', 'premium')}")
             print(f"  ↳ Payment Method: {body.get('payment_method', 'card')}")
@@ -146,7 +146,7 @@ def run(server_class=HTTPServer, handler_class=MockIntegrationHandler):
     server_address = ('', PORT)
     httpd = server_class(server_address, handler_class)
     print("=" * 70)
-    print(f"   LIFEMETRICS EHR (FHIR) & mybalanceapp.com MOCK INTEGRATIONS SERVER")
+    print(f"   LIFEMETRICS EHR (FHIR) & stripe.com MOCK INTEGRATIONS SERVER")
     print(f"   Running on local port: {PORT}")
     print("=" * 70)
     print("Press Ctrl+C to shut down the server.\n")
